@@ -1,0 +1,15 @@
+export const theme = {
+  bg: 'from-black via-gray-950 to-gray-900',
+  primaryAccent: 'green-500',
+  secondaryAccent: 'blue-600',
+  tertiaryAccent: 'blue-800',
+  cardBg: 'bg-gray-900/60',
+  cardBorder: 'border-green-800',
+  textColor: 'text-white',
+  lightTextColor: 'text-gray-300',
+  lighterTextColor: 'text-gray-400',
+  buttonBg: 'bg-gray-800/70',
+  buttonText: 'text-gray-200',
+  swatchColor: 'bg-gradient-to-r from-green-500 to-blue-600',
+  connectedDot: 'bg-lime-400',
+};
