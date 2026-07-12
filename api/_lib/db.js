@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS daily_listening_snapshots (
 CREATE TABLE IF NOT EXISTS journal_entries (
   date TEXT PRIMARY KEY,
   entry_text TEXT NOT NULL,
+  activities_json TEXT,
+  self_mood_emoji TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -61,6 +63,7 @@ CREATE TABLE IF NOT EXISTS recommendations (
   artist_name TEXT NOT NULL,
   spotify_uri TEXT,
   spotify_url TEXT,
+  image_url TEXT,
   reason TEXT,
   rank INTEGER NOT NULL DEFAULT 0,
   generated_at INTEGER NOT NULL,
@@ -70,7 +73,22 @@ CREATE TABLE IF NOT EXISTS recommendations (
 CREATE INDEX IF NOT EXISTS idx_recommendations_date ON recommendations(date);
 `;
 
+// Columns added after the initial release — ALTER TABLE for databases created
+// before these existed. Safe to re-run: duplicate-column errors are ignored.
+const MIGRATIONS = [
+  'ALTER TABLE journal_entries ADD COLUMN activities_json TEXT',
+  'ALTER TABLE journal_entries ADD COLUMN self_mood_emoji TEXT',
+  'ALTER TABLE recommendations ADD COLUMN image_url TEXT',
+];
+
 export async function ensureSchema() {
   const db = getDb();
   await db.executeMultiple(SCHEMA);
+  for (const migration of MIGRATIONS) {
+    try {
+      await db.execute(migration);
+    } catch (err) {
+      if (!/duplicate column/i.test(err.message)) throw err;
+    }
+  }
 }

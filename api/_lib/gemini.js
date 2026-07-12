@@ -1,32 +1,22 @@
-import { GoogleGenAI } from '@google/genai';
-
-let client;
-
-function getClient() {
-  if (!client) {
-    client = new GoogleGenAI({}); // reads GEMINI_API_KEY from env
-  }
-  return client;
-}
-
 const MODEL_ID = 'gemini-3.5-flash';
+const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const MOOD_AND_RECS_SCHEMA = {
-  type: 'object',
+  type: 'OBJECT',
   properties: {
-    mood_label: { type: 'string' },
-    mood_emoji: { type: 'string' },
-    summary: { type: 'string' },
-    confidence: { type: 'number' },
-    tags: { type: 'array', items: { type: 'string' } },
+    mood_label: { type: 'STRING' },
+    mood_emoji: { type: 'STRING' },
+    summary: { type: 'STRING' },
+    confidence: { type: 'NUMBER' },
+    tags: { type: 'ARRAY', items: { type: 'STRING' } },
     recommendations: {
-      type: 'array',
+      type: 'ARRAY',
       items: {
-        type: 'object',
+        type: 'OBJECT',
         properties: {
-          track_name: { type: 'string' },
-          artist_name: { type: 'string' },
-          reason: { type: 'string' },
+          track_name: { type: 'STRING' },
+          artist_name: { type: 'STRING' },
+          reason: { type: 'STRING' },
         },
         required: ['track_name', 'artist_name', 'reason'],
       },
@@ -57,18 +47,27 @@ Top genres today: ${snapshot.top_genres_json || '[]'}
 
 Based on the journal entry and the actual tracks/genres listened to today, identify the mood/emotional tone of the day, and suggest 3-5 songs that fit or complement that mood -- reasoned specifically against today's listening, not generic "similar artist" picks.`;
 
-  const interaction = await getClient().interactions.create({
-    model: MODEL_ID,
-    input: prompt,
-    response_format: {
-      type: 'text',
-      mime_type: 'application/json',
-      schema: MOOD_AND_RECS_SCHEMA,
-    },
+  const apiKey = process.env.GEMINI_API_KEY;
+  const resp = await fetch(`${API_BASE}/${MODEL_ID}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        response_mime_type: 'application/json',
+        response_schema: MOOD_AND_RECS_SCHEMA,
+      },
+    }),
   });
 
-  if (!interaction.output_text) {
+  if (!resp.ok) {
+    throw new Error(`Gemini API error ${resp.status}: ${await resp.text()}`);
+  }
+
+  const data = await resp.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
     throw new Error('Gemini did not return a structured mood analysis');
   }
-  return { result: JSON.parse(interaction.output_text), modelId: MODEL_ID };
+  return { result: JSON.parse(text), modelId: MODEL_ID };
 }

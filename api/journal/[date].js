@@ -23,7 +23,11 @@ export default async function handler(req, res) {
       res.status(404).json({ error: 'No journal entry for this date' });
       return;
     }
-    res.status(200).json(result.rows[0]);
+    const row = result.rows[0];
+    res.status(200).json({
+      ...row,
+      activities: JSON.parse(row.activities_json || '[]'),
+    });
     return;
   }
 
@@ -38,15 +42,19 @@ export default async function handler(req, res) {
       res.status(400).json({ error: 'entry_text must be 5000 characters or fewer' });
       return;
     }
+    const activities = Array.isArray(body.activities) ? body.activities.filter((a) => typeof a === 'string') : [];
+    const selfMoodEmoji = typeof body.self_mood_emoji === 'string' ? body.self_mood_emoji : null;
 
     const now = Date.now();
     await db.execute({
-      sql: `INSERT INTO journal_entries (date, entry_text, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
+      sql: `INSERT INTO journal_entries (date, entry_text, activities_json, self_mood_emoji, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(date) DO UPDATE SET
               entry_text = excluded.entry_text,
+              activities_json = excluded.activities_json,
+              self_mood_emoji = excluded.self_mood_emoji,
               updated_at = excluded.updated_at`,
-      args: [date, entryText, now, now],
+      args: [date, entryText, JSON.stringify(activities), selfMoodEmoji, now, now],
     });
 
     let moodError = null;
@@ -56,7 +64,7 @@ export default async function handler(req, res) {
       moodError = err.message;
     }
 
-    res.status(200).json({ date, entry_text: entryText, mood_error: moodError });
+    res.status(200).json({ date, entry_text: entryText, activities, self_mood_emoji: selfMoodEmoji, mood_error: moodError });
     return;
   }
 
@@ -105,9 +113,9 @@ export async function runMoodAnalysis(date, journalText) {
   for (let i = 0; i < resolved.length; i++) {
     const rec = resolved[i];
     await db.execute({
-      sql: `INSERT INTO recommendations (date, track_name, artist_name, spotify_uri, spotify_url, reason, rank, generated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [date, rec.track_name, rec.artist_name, rec.spotify_uri, rec.spotify_url, rec.reason, i, generatedAt],
+      sql: `INSERT INTO recommendations (date, track_name, artist_name, spotify_uri, spotify_url, image_url, reason, rank, generated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [date, rec.track_name, rec.artist_name, rec.spotify_uri, rec.spotify_url, rec.image_url, rec.reason, i, generatedAt],
     });
   }
 }
